@@ -1,0 +1,128 @@
+---
+title: "exercise"
+author: "Han feng"
+date: '2022-10-18'
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r}
+usethis::create_github_token()
+```
+
+
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+wbdata <- jsonlite::fromJSON(gzcon(url("https://github.com/cjbarrie/CS-ED/blob/main/data/web_historian_data.json?raw=true")))
+wbdata_short <- wbdata %>%
+  select(domain, searchTerms, urlId)
+wbdata %>%
+  group_by(domain) %>%
+  count()
+wbdata %>%
+  group_by(domain) %>%
+  count() %>%
+  arrange(desc(n))
+wbdata_mp <- wbdata %>%
+  group_by(domain) %>%
+  count() %>%
+  filter(n>5)
+wbdata_mp %>%
+  ggplot() +
+  geom_bar(aes(domain,n), stat="identity") +
+  coord_flip()
+```
+##1.Count the types of things I’m doing online (column “transType” in the wbdata). What is my most frequent type of interaction with the web?
+```{r}
+wbdata %>%
+  group_by(transType) %>%
+  count()
+```
+##Change the colour of the bars in the bar graph.
+```{r}
+wbdata_mp %>%
+  ggplot() +
+  geom_bar(mapping = aes(x = domain, y = n, fill = domain),stat="identity")+
+  coord_flip()
+```
+##igraph
+```{r}
+library(igraph)
+library(tidygraph)
+library(dplyr)
+library(RColorBrewer)
+library(classInt)
+nodes <- read.table(url("https://github.com/cjbarrie/CS-ED/blob/main/data/all.nodes.txt?raw=true"))
+edges <- read.table(url("https://github.com/cjbarrie/CS-ED/blob/main/data/all.edgelist.txt?raw=true"))
+```
+##change the name of column 
+```{r}
+install.packages("tidylog",  repos = "http://cran.us.r-project.org")
+library(tidylog)
+colnames(nodes) <- c("node1","lr")
+colnames(edges) <- c("node1", "node2", "type", "n", "id")
+rt_samp <- edges %>%
+  left_join(nodes, by = "node1") %>%
+  filter(type == "retweet")
+
+rt_samp$node1 <- as.character(rt_samp$node1)
+rt_samp$node2 <- as.character(rt_samp$node2)
+```
+#matrix-character-igraph
+```{r}
+igraph_rt_samp <- graph_from_edgelist(
+  as.matrix(rt_samp[,c("node1","node2")]),
+  directed = T
+)
+class(igraph_rt_samp)
+plot(simplify(igraph_rt_samp), 
+     vertex.label = NA, 
+     vertex.size = 2,
+     edge.arrow.size = 0)
+```
+#sample
+```{r}
+samp_attr <- data.frame(
+  node = V(igraph_rt_samp)$name,
+  node.seq = 1:length(V(igraph_rt_samp)$name),
+  degree.in = degree(igraph_rt_samp, mode = "in"), #unhash this to also estimate indegree
+  between.dir = betweenness(igraph_rt_samp, directed = T,normalized = T), #unhash this to also estimate betweenness
+  between.undir = betweenness(igraph_rt_samp, directed = F, normalized = T) #unhash this to also estimate betweenness (undirected)
+)
+```
+
+```{r}
+nodes$node <- as.character(nodes$node)
+nodes <- nodes %>%
+  mutate(lrcolor = recode(lr,
+                          "right" = "#DE0100",
+                          "left" = "#0015BC",
+                          "-" = "#a6a49f")
+  )
+samp_attr_lr <- samp_attr %>%
+  left_join(nodes, by = "node")
+plot(simplify(igraph_rt_samp), 
+     vertex.label = NA, 
+     vertex.size = 4,
+     vertex.color = samp_attr_lr$lrcolor,
+     edge.arrow.size = 0)
+```
+
+##Count how many “left” nodes there are and how many “right” nodes there are.
+```{r}
+table(nodes$lr)
+```
+##Add arrows to the network plot and increase their width
+```{r}
+
+plot(simplify(igraph_rt_samp), 
+     vertex.label = NA, 
+     vertex.size = 4,
+     vertex.color = samp_attr_lr$lrcolor,
+     edge.arrow.width=0.5,
+     edge.arrow.size = 0.3)
+
+```
+
