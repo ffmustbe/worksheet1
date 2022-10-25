@@ -1,6 +1,6 @@
 ---
 title: "exercise"
-author: "Han feng"
+author: "feng"
 date: '2022-10-18'
 output:
   pdf_document: default
